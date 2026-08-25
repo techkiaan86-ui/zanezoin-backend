@@ -13,7 +13,7 @@ const demoCredentials = {
 };
 
 async function testAll() {
-  const url = 'https://zanezion-backend-production-a303.up.railway.app/api/v1';
+  const url = 'https://zanezoin-backend-production.up.railway.app/api/v1';
   console.log(`Testing all demo credentials on Railway (${url}):\n`);
 
   for (const [role, creds] of Object.entries(demoCredentials)) {

@@ -2,7 +2,7 @@ import axios from 'axios';
 
 async function testPost() {
     try {
-        const loginRes = await axios.post('https://zanezion-backend-production.up.railway.app/api/v1/auth/login', {
+        const loginRes = await axios.post('https://zanezoin-backend-production.up.railway.app/api/v1/auth/login', {
             email: 'viratkholi@example.com', password: 'password123' 
         });
         const loginData = loginRes.data;
@@ -30,7 +30,7 @@ async function testPost() {
             ]
         };
 
-        const res = await axios.post('https://zanezion-backend-production.up.railway.app/api/v1/deliveries', payload, {
+        const res = await axios.post('https://zanezoin-backend-production.up.railway.app/api/v1/deliveries', payload, {
             headers: { 
                 'Authorization': `Bearer ${token}`
             }

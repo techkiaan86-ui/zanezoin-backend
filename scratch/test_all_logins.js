@@ -6,7 +6,7 @@ async function testAllLogins() {
   for (const email of emails) {
     try {
       console.log(`Testing login for ${email}...`);
-      const res = await axios.post('https://zanezion-backend-production.up.railway.app/api/v1/auth/login', {
+      const res = await axios.post('https://zanezoin-backend-production.up.railway.app/api/v1/auth/login', {
         email,
         password: 'admin123'
       });

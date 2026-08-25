@@ -3,7 +3,7 @@ import axios from 'axios';
 async function verifyRailway() {
   try {
     console.log('Testing live Railway backend with admin login...');
-    const loginRes = await axios.post('https://zanezion-backend-production.up.railway.app/api/v1/auth/login', {
+    const loginRes = await axios.post('https://zanezoin-backend-production.up.railway.app/api/v1/auth/login', {
       email: 'admin@zanezion.com',
       password: 'admin123'
     });
@@ -11,7 +11,7 @@ async function verifyRailway() {
     const token = loginRes.data.data.token;
     console.log('Login OK!');
 
-    const res = await axios.get('https://zanezion-backend-production.up.railway.app/api/v1/clients?page=1&limit=10&clientType=Personal', {
+    const res = await axios.get('https://zanezoin-backend-production.up.railway.app/api/v1/clients?page=1&limit=10&clientType=Personal', {
       headers: { Authorization: `Bearer ${token}` }
     });
 

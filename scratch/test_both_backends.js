@@ -14,7 +14,7 @@ async function testBothBackends() {
 
   console.log('--- 1. TESTING RAILWAY PRODUCTION BACKEND ---');
   try {
-    const railwayRes = await axios.get('https://zanezion-backend-production.up.railway.app/api/v1/clients?page=1&limit=10&clientType=Personal', {
+    const railwayRes = await axios.get('https://zanezoin-backend-production.up.railway.app/api/v1/clients?page=1&limit=10&clientType=Personal', {
       headers: { Authorization: `Bearer ${superAdminToken}` }
     });
     console.log('Railway Status:', railwayRes.status);

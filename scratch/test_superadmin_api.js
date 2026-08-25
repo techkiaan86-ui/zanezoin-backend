@@ -17,7 +17,7 @@ async function testSuperAdminApi() {
       { expiresIn: config.jwtExpiresIn }
     );
 
-    const res = await axios.get('https://zanezion-backend-production.up.railway.app/api/v1/clients?page=1&limit=10&clientType=Personal', {
+    const res = await axios.get('https://zanezoin-backend-production.up.railway.app/api/v1/clients?page=1&limit=10&clientType=Personal', {
       headers: { Authorization: `Bearer ${token}` }
     });
 

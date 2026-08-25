@@ -60,14 +60,18 @@ export const createOrder = async (data, performerId, tenantId) => {
     if (!isNaN(cid)) {
       client = await clientRepo.findClientById(cid);
       if (!client) {
-        client = await prisma.client.findFirst({
-          where: {
-            OR: [
-              { id: cid },
-              { userId: cid }
-            ]
-          }
-        });
+        // The provided cid might be a User ID instead of a Client ID
+        const userForClient = await prisma.user.findUnique({ where: { id: cid } });
+        if (userForClient?.email) {
+          client = await prisma.client.findFirst({
+            where: {
+              OR: [
+                { email: userForClient.email },
+                { companyName: userForClient.name }
+              ]
+            }
+          });
+        }
       }
     }
   }

@@ -2,8 +2,8 @@ import axios from 'axios';
 
 async function testRailwayLogin() {
   const urls = [
-    'https://zanezion-backend-production-a303.up.railway.app/api/v1',
-    'https://zanezion-backend-production.up.railway.app/api/v1'
+    'https://zanezoin-backend-production.up.railway.app/api/v1',
+    'https://zanezoin-backend-production.up.railway.app/api/v1'
   ];
 
   for (const url of urls) {

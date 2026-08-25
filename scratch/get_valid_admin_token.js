@@ -27,7 +27,7 @@ async function generateAdminToken() {
     // Test API call using axios locally or to railway with this token
     import('axios').then(async ({ default: axios }) => {
       try {
-        const res = await axios.get('https://zanezion-backend-production.up.railway.app/api/v1/clients?page=1&limit=10&clientType=Personal', {
+        const res = await axios.get('https://zanezoin-backend-production.up.railway.app/api/v1/clients?page=1&limit=10&clientType=Personal', {
           headers: { Authorization: `Bearer ${token}` }
         });
 

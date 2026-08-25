@@ -2,7 +2,7 @@ import axios from 'axios';
 
 async function debugRailwayUserObject() {
   try {
-    const loginRes = await axios.post('https://zanezion-backend-production.up.railway.app/api/v1/auth/login', {
+    const loginRes = await axios.post('https://zanezoin-backend-production.up.railway.app/api/v1/auth/login', {
       email: 'superadmin@zanezion.com',
       password: 'admin123'
     });

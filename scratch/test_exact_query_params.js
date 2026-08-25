@@ -2,7 +2,7 @@ import axios from 'axios';
 
 async function testExactQueryParams() {
   try {
-    const loginRes = await axios.post('https://zanezion-backend-production.up.railway.app/api/v1/auth/login', {
+    const loginRes = await axios.post('https://zanezoin-backend-production.up.railway.app/api/v1/auth/login', {
       email: 'superadmin@zanezion.com',
       password: 'admin123'
     });
@@ -10,10 +10,10 @@ async function testExactQueryParams() {
     const headers = { Authorization: `Bearer ${token}` };
 
     const urls = [
-      'https://zanezion-backend-production.up.railway.app/api/v1/clients?page=1&limit=10&clientType=Personal',
-      'https://zanezion-backend-production.up.railway.app/api/v1/clients?page=1&limit=10&clientType=Customers',
-      'https://zanezion-backend-production.up.railway.app/api/v1/clients?page=1&limit=10&clientType=individual',
-      'https://zanezion-backend-production.up.railway.app/api/v1/clients?page=1&limit=10'
+      'https://zanezoin-backend-production.up.railway.app/api/v1/clients?page=1&limit=10&clientType=Personal',
+      'https://zanezoin-backend-production.up.railway.app/api/v1/clients?page=1&limit=10&clientType=Customers',
+      'https://zanezoin-backend-production.up.railway.app/api/v1/clients?page=1&limit=10&clientType=individual',
+      'https://zanezoin-backend-production.up.railway.app/api/v1/clients?page=1&limit=10'
     ];
 
     for (const url of urls) {

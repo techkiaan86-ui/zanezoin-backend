@@ -1,6 +1,6 @@
 async function testSuperadminLogin() {
   try {
-    const res = await fetch('https://zanezion-backend-production-a303.up.railway.app/api/v1/auth/login', {
+    const res = await fetch('https://zanezoin-backend-production.up.railway.app/api/v1/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email: 'superadmin@zanezion.com', password: 'admin@123' })
