@@ -82,14 +82,16 @@ export const getClients = async (req, res, next) => {
     const rawRole = typeof req.user?.role === 'string' ? req.user.role : (req.user?.role?.name || req.user?.roleName || '');
     const roleName = String(rawRole).toUpperCase();
     const userTenant = req.user?.tenantId ? Number(req.user.tenantId) : 1;
-    const isHQSuperAdmin = (roleName === 'SUPER_ADMIN' || roleName === 'SUPERADMIN' || req.user?.roleId === 1) && userTenant === 1;
+    const isHQStaff = [
+      'SUPER_ADMIN', 'SUPERADMIN', 'ADMIN', 'INVENTORY', 'INVENTORY_MANAGER', 'OPERATIONS', 'LOGISTICS', 'PROCUREMENT', 'CONCIERGE', 'STAFF', 'SECURITY'
+    ].includes(roleName) || req.user?.roleId === 1 || req.user?.roleId === 2 || userTenant === 1;
 
     let tenantIdToFilter = resolveTenantId(req);
-    if (isHQSuperAdmin) {
+    if (isHQStaff) {
       if (req.query?.tenantId) {
         tenantIdToFilter = Number(req.query.tenantId);
       } else {
-        tenantIdToFilter = null; // HQ Super Admin can view across all tenants if no specific tenant requested
+        tenantIdToFilter = null; // HQ Staff can view across all tenants if no specific tenant requested
       }
     }
 
@@ -121,10 +123,13 @@ export const getClients = async (req, res, next) => {
 export const getClientById = async (req, res, next) => {
   try {
     const rawRole = typeof req.user.role === 'string' ? req.user.role : (req.user.role?.name || req.user.roleName || '');
-    const isSuperAdmin = String(rawRole).toUpperCase() === 'SUPER_ADMIN' || req.user.roleId === 1;
+    const roleName = String(rawRole).toUpperCase();
+    const isHQStaff = [
+      'SUPER_ADMIN', 'SUPERADMIN', 'ADMIN', 'INVENTORY', 'INVENTORY_MANAGER', 'OPERATIONS', 'LOGISTICS', 'PROCUREMENT', 'CONCIERGE', 'STAFF', 'SECURITY'
+    ].includes(roleName) || req.user?.roleId === 1 || req.user?.roleId === 2;
 
     let tenantIdToFilter = resolveTenantId(req);
-    if (isSuperAdmin) {
+    if (isHQStaff) {
       tenantIdToFilter = null;
     }
 
@@ -138,10 +143,13 @@ export const getClientById = async (req, res, next) => {
 export const updateClient = async (req, res, next) => {
   try {
     const rawRole = typeof req.user.role === 'string' ? req.user.role : (req.user.role?.name || req.user.roleName || '');
-    const isSuperAdmin = String(rawRole).toUpperCase() === 'SUPER_ADMIN' || req.user.roleId === 1;
+    const roleName = String(rawRole).toUpperCase();
+    const isHQStaff = [
+      'SUPER_ADMIN', 'SUPERADMIN', 'ADMIN', 'INVENTORY', 'INVENTORY_MANAGER', 'OPERATIONS', 'LOGISTICS', 'PROCUREMENT', 'CONCIERGE', 'STAFF', 'SECURITY'
+    ].includes(roleName) || req.user?.roleId === 1 || req.user?.roleId === 2;
 
     let tenantIdToFilter = resolveTenantId(req);
-    if (isSuperAdmin) {
+    if (isHQStaff) {
       tenantIdToFilter = null;
     }
 
@@ -212,10 +220,12 @@ export const deleteClient = async (req, res, next) => {
   try {
     const rawRole = typeof req.user.role === 'string' ? req.user.role : (req.user.role?.name || req.user.roleName || '');
     const roleName = String(rawRole).toUpperCase();
-    const isSuperAdmin = roleName === 'SUPER_ADMIN' || req.user.roleId === 1;
+    const isHQStaff = [
+      'SUPER_ADMIN', 'SUPERADMIN', 'ADMIN'
+    ].includes(roleName) || req.user?.roleId === 1 || req.user?.roleId === 2;
 
     let tenantIdToFilter = resolveTenantId(req);
-    if (isSuperAdmin) {
+    if (isHQStaff) {
       tenantIdToFilter = null;
     }
 
