@@ -28,13 +28,16 @@ export const findAllItems = async (tenantId, query) => {
   let where = {};
 
   if (resolvedClientId || userTenantId) {
-    where = {
-      OR: [
-        ...(resolvedClientId ? [{ clientId: Number(resolvedClientId) }] : []),
-        ...(userTenantId ? [{ tenantId: Number(userTenantId) }] : []),
-        { inventoryType: 'MARKETPLACE' }
-      ]
-    };
+    if (query.inventoryType === 'MARKETPLACE' || query.type === 'marketplace' || query.scope === 'marketplace') {
+      where = { inventoryType: 'MARKETPLACE' };
+    } else {
+      where = {
+        OR: [
+          ...(resolvedClientId ? [{ clientId: Number(resolvedClientId) }] : []),
+          ...(userTenantId ? [{ tenantId: Number(userTenantId) }] : [])
+        ]
+      };
+    }
   } else if (tenantId !== null && tenantId !== undefined) {
     where.tenantId = Array.isArray(tenantId) ? { in: tenantId.map(Number) } : Number(tenantId);
   }
