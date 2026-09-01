@@ -48,8 +48,20 @@ export const uploadItemImage = async (req, res, next) => {
 
 export const createItem = async (req, res, next) => {
   try {
-    const isSuperAdmin = req.user.role?.name === 'SUPER_ADMIN';
-    const tenantIdToUse = isSuperAdmin ? (req.body.tenantId || req.user.tenantId || 1) : (req.user.tenantId || 1);
+    const rawRole = typeof req.user?.role === 'string' ? req.user.role : (req.user?.role?.name || req.user?.roleName || '');
+    const roleName = String(rawRole).toUpperCase();
+    const isSuperAdmin = roleName === 'SUPER_ADMIN' || roleName === 'SUPERADMIN' || req.user?.roleId === 1;
+
+    let tenantIdToUse = isSuperAdmin ? (req.body.tenantId || req.user.tenantId || 1) : (req.user.tenantId || 1);
+
+    if (req.body.clientId) {
+      const targetClient = await prisma.client.findUnique({
+        where: { id: Number(req.body.clientId) }
+      });
+      if (targetClient && targetClient.tenantId) {
+        tenantIdToUse = targetClient.tenantId;
+      }
+    }
 
     const item = await itemService.createItem(req.body, req.user.id, tenantIdToUse);
     sendResponse(res, 201, 'Item created successfully', item);
@@ -58,26 +70,44 @@ export const createItem = async (req, res, next) => {
   }
 };
 
-const checkIsClient = (user) => {
-  const roleName = String(user?.role?.name || user?.role || '').toUpperCase();
-  if (roleName === 'SAAS_CLIENT' || roleName === 'BUSINESS_CLIENT') return false;
-  return roleName.includes('CLIENT') || roleName.includes('CUSTOMER');
-};
-
 export const getItems = async (req, res, next) => {
   try {
-    const roleName = String(req.user?.role?.name || req.user?.role || '').toUpperCase();
-    const isSuperAdmin = roleName === 'SUPER_ADMIN' || roleName === 'SUPERADMIN';
-    const isSaaSTenant = req.user.tenantId && Number(req.user.tenantId) !== 1;
-    const isClient = checkIsClient(req.user) && !isSaaSTenant;
+    const rawRole = typeof req.user?.role === 'string' ? req.user.role : (req.user?.role?.name || req.user?.roleName || '');
+    const roleName = String(rawRole).toUpperCase();
+    const userTenant = req.user?.tenantId ? Number(req.user.tenantId) : 1;
+    const isHQStaff = [
+      'SUPER_ADMIN', 'SUPERADMIN', 'ADMIN', 'INVENTORY', 'INVENTORY_MANAGER', 'OPERATIONS', 'LOGISTICS', 'PROCUREMENT', 'CONCIERGE', 'STAFF', 'SECURITY'
+    ].includes(roleName) || req.user?.roleId === 1 || req.user?.roleId === 2 || (userTenant === 1 && !['BUSINESS_CLIENT', 'CUSTOMER', 'SAAS_CLIENT', 'INDIVIDUAL_CLIENT'].includes(roleName));
 
-    const tenantIdToFilter = isSuperAdmin && !req.query.tenantId ? null :
-                             isSaaSTenant ? Number(req.user.tenantId) :
-                             isClient ? [1, req.user.tenantId].filter(t => t !== null && t !== undefined).map(Number) :
-                             (req.query.tenantId ? Number(req.query.tenantId) : req.user.tenantId);
+    if (isHQStaff) {
+      const tenantIdToFilter = req.query.tenantId ? Number(req.query.tenantId) : null;
+      const result = await itemService.getItems(tenantIdToFilter, req.query);
+      return sendResponse(res, 200, 'Items fetched successfully', result);
+    }
 
-    const result = await itemService.getItems(tenantIdToFilter, req.query);
-    sendResponse(res, 200, 'Items fetched successfully', result);
+    // For Business Clients, Customers, SaaS Tenants:
+    let resolvedClientId = req.user.clientId;
+    if (!resolvedClientId) {
+      const clientRec = await prisma.client.findFirst({
+        where: {
+          OR: [
+            { email: req.user.email },
+            ...(req.user.tenantId ? [{ tenantId: req.user.tenantId }] : []),
+            { companyName: req.user.name || '' }
+          ]
+        }
+      });
+      if (clientRec) resolvedClientId = clientRec.id;
+    }
+
+    const clientQuery = {
+      ...req.query,
+      resolvedClientId: resolvedClientId ? Number(resolvedClientId) : undefined,
+      userTenantId: req.user.tenantId ? Number(req.user.tenantId) : undefined
+    };
+
+    const result = await itemService.getItems(null, clientQuery);
+    return sendResponse(res, 200, 'Items fetched successfully', result);
   } catch (error) {
     next(error);
   }
@@ -85,15 +115,7 @@ export const getItems = async (req, res, next) => {
 
 export const getItemById = async (req, res, next) => {
   try {
-    const isSuperAdmin = req.user.role?.name === 'SUPER_ADMIN';
-    const isClient = checkIsClient(req.user);
-    const isSaaSTenant = req.user.tenantId && Number(req.user.tenantId) !== 1;
-    const tenantIdToFilter = isSuperAdmin ? null :
-                             isClient ? [1, req.user.tenantId].filter(t => t !== null && t !== undefined).map(Number) :
-                             isSaaSTenant ? Number(req.user.tenantId) :
-                             (req.user.tenantId || 1);
-
-    const item = await itemService.getItemById(Number(req.params.id), tenantIdToFilter);
+    const item = await itemService.getItemById(Number(req.params.id), null);
     sendResponse(res, 200, 'Item fetched successfully', item);
   } catch (error) {
     next(error);

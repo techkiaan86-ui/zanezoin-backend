@@ -21,27 +21,47 @@ export const findItemBySku = async (sku, tenantId) => {
 };
 
 export const findAllItems = async (tenantId, query) => {
-  const { page = 1, limit = 10, search = '', status, categoryId, clientId } = query;
-  const skip = (page - 1) * limit;
+  const { page = 1, limit = 10, search = '', status, categoryId, clientId, resolvedClientId, userTenantId } = query;
+  const limitVal = (limit != null && !isNaN(Number(limit))) ? Number(limit) : 10;
+  const skip = (page - 1) * limitVal;
 
-  const where = {
-    ...(tenantId !== null && (Array.isArray(tenantId) ? { tenantId: { in: tenantId.map(Number) } } : { tenantId: Number(tenantId) })),
-    ...(search && {
+  let where = {};
+
+  if (resolvedClientId || userTenantId) {
+    where = {
+      OR: [
+        ...(resolvedClientId ? [{ clientId: Number(resolvedClientId) }] : []),
+        ...(userTenantId ? [{ tenantId: Number(userTenantId) }] : []),
+        { inventoryType: 'MARKETPLACE' }
+      ]
+    };
+  } else if (tenantId !== null && tenantId !== undefined) {
+    where.tenantId = Array.isArray(tenantId) ? { in: tenantId.map(Number) } : Number(tenantId);
+  }
+
+  if (search) {
+    const searchCondition = {
       OR: [
         { name: { contains: search } },
         { sku: { contains: search } }
       ]
-    }),
-    ...(status && { status }),
-    ...(categoryId && { categoryId: Number(categoryId) }),
-    ...(clientId && { clientId: Number(clientId) })
-  };
+    };
+    if (where.OR) {
+      where = { AND: [{ OR: where.OR }, searchCondition] };
+    } else {
+      where.OR = searchCondition.OR;
+    }
+  }
+
+  if (status) where.status = status;
+  if (categoryId) where.categoryId = Number(categoryId);
+  if (clientId) where.clientId = Number(clientId);
 
   const [items, total] = await Promise.all([
     prisma.item.findMany({
       where,
       skip: Number(skip),
-      take: Number(limit),
+      take: Number(limitVal),
       orderBy: { createdAt: 'desc' },
       include: {
         category: { select: { name: true } },
@@ -52,7 +72,7 @@ export const findAllItems = async (tenantId, query) => {
     prisma.item.count({ where })
   ]);
 
-  return { items, total, page: Number(page), totalPages: Math.ceil(total / limit) };
+  return { items, total, page: Number(page), totalPages: Math.ceil(total / limitVal) };
 };
 
 export const updateItem = async (id, data) => {
