@@ -8,36 +8,63 @@ const app = express();
 
 // Middleware
 app.use(helmet({ crossOriginResourcePolicy: false }));
-app.use(
-  cors({
-    origin: (origin, callback) => {
-      // Allow requests with no origin (e.g., curl, Postman, mobile apps)
-      if (!origin) return callback(null, true);
 
-      const envOrigins = (process.env.ALLOWED_ORIGINS || process.env.FRONTEND_URL || '')
-        .split(',')
-        .map(o => o.trim())
-        .filter(Boolean);
+const corsOptions = {
+  origin: (origin, callback) => {
+    // Allow requests with no origin (e.g., curl, Postman, mobile apps, server-to-server)
+    if (!origin) return callback(null, true);
 
-      const allowedOrigins = [
-        'https://zanezion.kiaansoftware.com',
-        ...envOrigins
-      ];
+    const cleanOrigin = origin.replace(/\/+$/, '');
 
-      // Allow any localhost or 127.0.0.1 port for local development
-      const isLocalhost = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
+    const envOrigins = (process.env.ALLOWED_ORIGINS || process.env.FRONTEND_URL || '')
+      .split(',')
+      .map(o => o.trim().replace(/\/+$/, ''))
+      .filter(Boolean);
 
-      if (isLocalhost || allowedOrigins.includes(origin) || allowedOrigins.includes('*')) {
-        callback(null, true);
-      } else {
-        callback(new Error(`CORS: Origin '${origin}' not allowed`));
-      }
-    },
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
-    credentials: true
-  })
-);
+    const allowedOrigins = [
+      'https://zanezion.kiaansoftware.com',
+      'https://zanezion-01.netlify.app',
+      'https://zanezion.netlify.app',
+      ...envOrigins
+    ];
+
+    // Allow any localhost or 127.0.0.1 port for local development
+    const isLocalhost = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(cleanOrigin);
+
+    // Allow Netlify & Vercel deployments / preview domains
+    const isNetlify = /^https:\/\/[a-zA-Z0-9_.-]+\.netlify\.app$/.test(cleanOrigin);
+    const isVercel = /^https:\/\/[a-zA-Z0-9_.-]+\.vercel\.app$/.test(cleanOrigin);
+
+    if (
+      isLocalhost ||
+      isNetlify ||
+      isVercel ||
+      allowedOrigins.includes(cleanOrigin) ||
+      allowedOrigins.includes('*')
+    ) {
+      return callback(null, true);
+    } else {
+      console.warn(`[CORS] Disallowed origin: ${origin}`);
+      return callback(null, false);
+    }
+  },
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: [
+    'Content-Type',
+    'Authorization',
+    'X-Requested-With',
+    'Accept',
+    'Origin',
+    'x-tenant-id',
+    'x-company-id',
+    'x-access-token'
+  ],
+  exposedHeaders: ['Content-Range', 'X-Content-Range'],
+  credentials: true,
+  optionsSuccessStatus: 200
+};
+
+app.use(cors(corsOptions));
 
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
