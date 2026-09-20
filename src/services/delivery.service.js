@@ -120,12 +120,19 @@ export const createDelivery = async (data, performerId, tenantId) => {
       adHocWarehouseId = newWarehouse.id;
     }
 
-    // Parse manifest items from remarks to get actual item names
+    // Parse manifest items from remarks to get actual item names and prices
     let manifestItems = [];
     try {
       const remarksData = typeof data.remarks === 'string' ? JSON.parse(data.remarks) : (data.remarks || {});
-      manifestItems = Array.isArray(remarksData.manifestItems) ? remarksData.manifestItems : [];
+      if (Array.isArray(remarksData.manifestItems)) {
+        manifestItems = remarksData.manifestItems;
+      } else if (remarksData.package_details) {
+        manifestItems = typeof remarksData.package_details === 'string'
+          ? JSON.parse(remarksData.package_details)
+          : remarksData.package_details;
+      }
     } catch (e) { /* ignore parse errors */ }
+    if (!Array.isArray(manifestItems)) manifestItems = [];
 
     data.warehouseId = adHocWarehouseId;
     deliveryData.warehouseId = adHocWarehouseId;
@@ -145,7 +152,7 @@ export const createDelivery = async (data, performerId, tenantId) => {
 
     const itemsToProcess = items || [];
     
-    // Build valid order items without creating garbage records in the Item inventory table
+    // Build valid order items preserving real item names and unit prices
     const validItems = await Promise.all(itemsToProcess.map(async (it, index) => {
       let itemExists = null;
       const numItemId = Number(it.itemId);
@@ -155,22 +162,39 @@ export const createDelivery = async (data, performerId, tenantId) => {
         });
       }
 
-      const manifestItem = manifestItems[index];
+      const manifestItem = manifestItems[index] || {};
       const itemName = (manifestItem?.name || it.name || '').trim() || `Custom Item ${index + 1}`;
+      const itemUnitPrice = Number(manifestItem?.price || manifestItem?.unitPrice || it.price || it.unitPrice || 0) || 0;
+      const itemQty = Number(manifestItem?.qty || manifestItem?.quantity || it.quantity || it.qty || 1) || 1;
 
       return {
         ...(itemExists ? { itemId: itemExists.id } : {}),
         name: itemName,
-        quantity: it.quantity || 1,
-        unitPrice: 0,
+        quantity: itemQty,
+        unitPrice: itemUnitPrice,
         warehouseId: adHocWarehouseId
       };
     }));
+
+    const itemsSourceForMeta = manifestItems.length > 0 ? manifestItems : validItems;
+    let computedTotal = itemsSourceForMeta.reduce((sum, itm) => {
+      const p = Number(itm.price || itm.unitPrice || 0) || 0;
+      const q = Number(itm.qty || itm.quantity || 1) || 1;
+      return sum + (p * q);
+    }, 0);
+    if (computedTotal === 0 && data.deliveryFee) computedTotal = Number(data.deliveryFee) || 0;
 
     // Build order metadata from manifest so order page shows correct info
     const orderMetadata = {};
     if (manifestItems.length > 0) {
       orderMetadata.manifestItems = manifestItems;
+      orderMetadata.customItems = manifestItems;
+    } else if (itemsToProcess.length > 0) {
+      orderMetadata.customItems = itemsToProcess;
+    }
+    if (computedTotal > 0) {
+      orderMetadata.total_amount = computedTotal;
+      orderMetadata.subtotal = computedTotal;
     }
     if (data.missionType) orderMetadata.missionType = data.missionType;
     if (data.transportMode) orderMetadata.transportMode = data.transportMode;
@@ -184,6 +208,7 @@ export const createDelivery = async (data, performerId, tenantId) => {
       status: 'approved',
       orderType: data.missionType === 'Chauffeur' ? 'Service' : 'Delivery',
       priority: 'high',
+      totalAmount: computedTotal,
       metadata: orderMetadata
     }, validItems, tenantId);
 

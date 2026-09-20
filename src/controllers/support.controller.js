@@ -5,7 +5,8 @@ import { emitToTenant } from '../utils/socket.js';
 import { resolveTenantId } from '../utils/tenantResolver.js';
 const handleRequest = async (req, res, next, serviceFn, successMsg, eventName) => {
   try {
-    const isSuperAdmin = req.user.role?.name === 'SUPER_ADMIN';
+    const roleName = String(typeof req.user?.role === 'string' ? req.user.role : (req.user?.role?.name || '')).toUpperCase();
+    const isSuperAdminOrAdmin = ['SUPER_ADMIN', 'SUPERADMIN', 'ADMIN'].includes(roleName) && (Number(req.user.tenantId) === 1 || !req.user.tenantId);
     let tenantId;
     
     if (req.method === 'GET') {
@@ -13,17 +14,17 @@ const handleRequest = async (req, res, next, serviceFn, successMsg, eventName) =
       const result = await serviceFn(tenantId, req.user);
       sendResponse(res, 200, successMsg, result);
     } else if (req.method === 'POST') {
-      tenantId = isSuperAdmin ? (req.body.tenantId || req.user.tenantId || 1) : (req.user.tenantId || 1);
+      tenantId = isSuperAdminOrAdmin ? (req.body.tenantId || req.user.tenantId || 1) : (req.user.tenantId || 1);
       const result = await serviceFn(req.body, req.user.id, tenantId);
       if (eventName) emitToTenant(result.tenantId || tenantId, eventName, result);
       sendResponse(res, 201, successMsg, result);
     } else if (req.method === 'PUT') {
-      tenantId = resolveTenantId(req);
+      tenantId = isSuperAdminOrAdmin ? null : resolveTenantId(req);
       const result = await serviceFn(req.params.id, req.body, tenantId, req.user.id);
       if (eventName) emitToTenant(result.tenantId || tenantId || req.user.tenantId, eventName, result);
       sendResponse(res, 200, successMsg, result);
     } else if (req.method === 'DELETE') {
-      tenantId = resolveTenantId(req);
+      tenantId = isSuperAdminOrAdmin ? null : resolveTenantId(req);
       await serviceFn(req.params.id, tenantId, req.user.id);
       if (eventName) emitToTenant(tenantId || req.user.tenantId, eventName, { id: req.params.id, deleted: true });
       sendResponse(res, 200, successMsg, null);

@@ -12,12 +12,17 @@ export const createOrder = async (req, res, next) => {
     let incomingVendorId = req.body.vendorId ?? req.body.vendor_id;
     let incomingCompanyId = req.body.companyId ?? req.body.company_id;
 
+    const rawRole = typeof req.user?.role === 'string' ? req.user.role : (req.user?.role?.name || req.user?.roleName || '');
+    const roleName = String(rawRole).toUpperCase();
+    const isCustomerRole = ['INDIVIDUAL_CLIENT', 'CUSTOMER'].includes(roleName);
     const isBusinessClient = req.user.role?.name === 'BUSINESS_CLIENT' || req.user.role?.name === 'CLIENT';
-    const tenantIdToUse = req.body.tenantId
-      ? Number(req.body.tenantId)
-      : (incomingCompanyId && !isNaN(Number(incomingCompanyId)) && Number(incomingCompanyId) > 0
-          ? Number(incomingCompanyId)
-          : resolveTenantId(req));
+    const tenantIdToUse = isCustomerRole
+      ? (req.user.tenantId ? Number(req.user.tenantId) : resolveTenantId(req))
+      : (req.body.tenantId
+          ? Number(req.body.tenantId)
+          : (incomingCompanyId && !isNaN(Number(incomingCompanyId)) && Number(incomingCompanyId) > 0
+              ? Number(incomingCompanyId)
+              : resolveTenantId(req)));
 
     // Try to parse clientId from payload
     let parsedClientId = incomingClientId && incomingClientId !== "" && incomingClientId !== "CLT-GUEST" ? Number(incomingClientId) : null;
@@ -25,9 +30,19 @@ export const createOrder = async (req, res, next) => {
     // If clientId is missing/invalid (e.g. customer/staff user sending 'CLT-GUEST' or nothing),
     // auto-resolve from their user account via email → find or create a Client record.
     if (!parsedClientId || isNaN(parsedClientId) || parsedClientId <= 0) {
-      let clientRecord = await prisma.client.findFirst({
-        where: { email: req.user.email }
-      });
+      let clientRecord = null;
+      if (req.user.email) {
+        if (req.user.tenantId && req.user.tenantId !== 1) {
+          clientRecord = await prisma.client.findFirst({
+            where: { email: req.user.email, tenantId: req.user.tenantId }
+          });
+        }
+        if (!clientRecord) {
+          clientRecord = await prisma.client.findFirst({
+            where: { email: req.user.email }
+          });
+        }
+      }
 
       if (!clientRecord && req.user.name) {
         clientRecord = await prisma.client.findFirst({
@@ -101,14 +116,10 @@ export const getOrders = async (req, res, next) => {
     if (isCustomerRole) {
       let resolvedClientId = req.user.clientId;
       if (!resolvedClientId) {
-        const clientRec = await prisma.client.findFirst({
-          where: {
-            OR: [
-              { email: req.user.email },
-              { companyName: req.user.name || '' }
-            ]
-          }
-        });
+        const clientRec = (req.user.email && req.user.tenantId && req.user.tenantId !== 1
+          ? await prisma.client.findFirst({ where: { email: req.user.email, tenantId: req.user.tenantId } })
+          : null) || (req.user.email ? await prisma.client.findFirst({ where: { email: req.user.email } }) : null)
+          || (req.user.name ? await prisma.client.findFirst({ where: { companyName: req.user.name } }) : null);
         if (clientRec) resolvedClientId = clientRec.id;
       }
       // Always enforce user-scoped filtering for customer accounts
@@ -120,14 +131,8 @@ export const getOrders = async (req, res, next) => {
     } else if (isClientRole) {
       let resolvedClientId = req.user.clientId;
       if (!resolvedClientId) {
-        const clientRec = await prisma.client.findFirst({
-          where: {
-            OR: [
-              { email: req.user.email },
-              { companyName: req.user.name || '' }
-            ]
-          }
-        });
+        const clientRec = (req.user.email ? await prisma.client.findFirst({ where: { email: req.user.email } }) : null)
+          || (req.user.name ? await prisma.client.findFirst({ where: { companyName: req.user.name } }) : null);
         if (clientRec) resolvedClientId = clientRec.id;
       }
       if (resolvedClientId) {

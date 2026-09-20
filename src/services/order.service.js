@@ -64,13 +64,18 @@ export const createOrder = async (data, performerId, tenantId) => {
         const userForClient = await prisma.user.findUnique({ where: { id: cid } });
         if (userForClient?.email) {
           client = await prisma.client.findFirst({
-            where: {
-              OR: [
-                { email: userForClient.email },
-                { companyName: userForClient.name }
-              ]
-            }
+            where: { email: userForClient.email, ...(userForClient.tenantId ? { tenantId: userForClient.tenantId } : {}) }
           });
+          if (!client) {
+            client = await prisma.client.findFirst({
+              where: { email: userForClient.email }
+            });
+          }
+          if (!client && userForClient.name) {
+            client = await prisma.client.findFirst({
+              where: { companyName: userForClient.name, ...(userForClient.tenantId ? { tenantId: userForClient.tenantId } : {}) }
+            });
+          }
         }
       }
     }
@@ -193,61 +198,73 @@ export const createOrder = async (data, performerId, tenantId) => {
   const itemsToSave = customItems.length > 0 ? customItems : (items || []);
   const customItem = (customItems && customItems[0]) || (items && items[0]) || (existingMeta && existingMeta.customItems && existingMeta.customItems[0]) || {};
 
-  // Determine client name fallback for guestName / passengerName if not explicitly provided
-  const resolvedClientName = client ? (client.companyName || client.contactPerson || client.name) : (orderData.clientName || 'Guest Client');
-  const rawPassengerName = data.passengerName || data.passenger_name || data.guestName || data.guest_name || customItem.passengerName || customItem.passenger_name || customItem.guestName || customItem.guest_name || existingMeta.passengerName || existingMeta.guestName;
-  const passengerName = (rawPassengerName && String(rawPassengerName).trim() && String(rawPassengerName).toLowerCase() !== 'personal client')
-    ? String(rawPassengerName).trim()
-    : (resolvedClientName && resolvedClientName.toLowerCase() !== 'personal client' ? resolvedClientName : (customItem.passengerName || customItem.guestName || rawPassengerName || resolvedClientName));
-
-  const numberOfPassengers = Number(data.numberOfPassengers || data.passengers || data.passengerCount || customItem.numberOfPassengers || customItem.passengers || customItem.passengerCount || existingMeta.numberOfPassengers || existingMeta.passengers || 1);
-  const rawAmenities = data.amenities || customItem.amenities || existingMeta.amenities || [];
-  const amenitiesArray = Array.isArray(rawAmenities)
-    ? rawAmenities
-    : (typeof rawAmenities === 'string' && rawAmenities.trim() ? rawAmenities.split(',').map(s => s.trim()) : []);
-
-  const amenitiesLower = amenitiesArray.map(a => String(a).toLowerCase());
-  const wifi = (data.wifi === 'Yes' || customItem.wifi === 'Yes' || existingMeta.wifi === 'Yes' || amenitiesLower.some(a => a.includes('wifi'))) ? 'Yes' : 'No';
-  const refreshments = (data.refreshments === 'Yes' || customItem.refreshments === 'Yes' || existingMeta.refreshments === 'Yes' || amenitiesLower.some(a => a.includes('refreshment'))) ? 'Yes' : 'No';
-  const carSeat = (data.carSeat === 'Yes' || data.car_seat === 'Yes' || customItem.carSeat === 'Yes' || customItem.car_seat === 'Yes' || existingMeta.carSeat === 'Yes' || existingMeta.car_seat === 'Yes' || amenitiesLower.some(a => a.includes('car seat') || a.includes('baby'))) ? 'Yes' : 'No';
-  const stops = data.stops || customItem.stops || existingMeta.stops || 'No';
-  const stopLocations = data.stopLocations || data.stop_locations || customItem.stopLocations || existingMeta.stopLocations || null;
-  const rawBags = Number(data.bags !== undefined ? data.bags : (customItem.bags !== undefined ? customItem.bags : (existingMeta.bags !== undefined ? existingMeta.bags : 0)));
-  const luggage = (data.luggage && data.luggage !== 'No') ? data.luggage : (customItem.luggage && customItem.luggage !== 'No' ? customItem.luggage : (existingMeta.luggage && existingMeta.luggage !== 'No' ? existingMeta.luggage : (rawBags > 0 ? `Yes — ${rawBags} bag(s)` : 'No')));
-  const bags = rawBags;
-  const serviceType = data.serviceType || customItem.serviceType || existingMeta.serviceType || 'One Way';
-  const returnDate = data.returnDate || customItem.returnDate || existingMeta.returnDate || null;
-  const returnTime = data.returnTime || customItem.returnTime || existingMeta.returnTime || null;
-  const pickupTime = data.pickupTime || customItem.pickupTime || existingMeta.pickupTime || null;
-  const pickupLocation = data.pickupLocation || data.pickup_location || customItem.pickupLocation || existingMeta.pickupLocation || '';
   const dropLocation = data.dropLocation || data.drop_location || data.location || customItem.dropLocation || existingMeta.dropLocation || '';
+  const pickupLocation = data.pickupLocation || data.pickup_location || customItem.pickupLocation || existingMeta.pickupLocation || '';
   const totalDistance = data.totalDistance || data.total_distance || customItem.totalDistance || existingMeta.totalDistance || '';
 
-  orderData.metadata = {
-    ...existingMeta,
-    numberOfPassengers,
-    passengers: numberOfPassengers,
-    passengerCount: numberOfPassengers,
-    passengerName,
-    guestName: passengerName,
-    luggage: (luggage === 'Yes' && bags > 0) ? `Yes — ${bags} bag(s)` : luggage,
-    bags,
-    stops,
-    stopLocations,
-    wifi,
-    refreshments,
-    carSeat,
-    amenities: amenitiesArray,
-    serviceType,
-    returnDate,
-    returnTime,
-    pickupTime,
-    pickupLocation,
-    dropLocation,
-    location: dropLocation,
-    totalDistance,
-    customItems: metaCustomItems.length > 0 ? metaCustomItems : itemsToSave
-  };
+  if (isChauffeurOrder) {
+    // Determine client name fallback for guestName / passengerName if not explicitly provided
+    const resolvedClientName = client ? (client.companyName || client.contactPerson || client.name) : (orderData.clientName || 'Guest Client');
+    const rawPassengerName = data.passengerName || data.passenger_name || data.guestName || data.guest_name || customItem.passengerName || customItem.passenger_name || customItem.guestName || customItem.guest_name || existingMeta.passengerName || existingMeta.guestName;
+    const passengerName = (rawPassengerName && String(rawPassengerName).trim() && String(rawPassengerName).toLowerCase() !== 'personal client')
+      ? String(rawPassengerName).trim()
+      : (resolvedClientName && resolvedClientName.toLowerCase() !== 'personal client' ? resolvedClientName : (customItem.passengerName || customItem.guestName || rawPassengerName || resolvedClientName));
+
+    const numberOfPassengers = Number(data.numberOfPassengers || data.passengers || data.passengerCount || customItem.numberOfPassengers || customItem.passengers || customItem.passengerCount || existingMeta.numberOfPassengers || existingMeta.passengers || 1);
+    const rawAmenities = data.amenities || customItem.amenities || existingMeta.amenities || [];
+    const amenitiesArray = Array.isArray(rawAmenities)
+      ? rawAmenities
+      : (typeof rawAmenities === 'string' && rawAmenities.trim() ? rawAmenities.split(',').map(s => s.trim()) : []);
+
+    const amenitiesLower = amenitiesArray.map(a => String(a).toLowerCase());
+    const wifi = (data.wifi === 'Yes' || customItem.wifi === 'Yes' || existingMeta.wifi === 'Yes' || amenitiesLower.some(a => a.includes('wifi'))) ? 'Yes' : 'No';
+    const refreshments = (data.refreshments === 'Yes' || customItem.refreshments === 'Yes' || existingMeta.refreshments === 'Yes' || amenitiesLower.some(a => a.includes('refreshment'))) ? 'Yes' : 'No';
+    const carSeat = (data.carSeat === 'Yes' || data.car_seat === 'Yes' || customItem.carSeat === 'Yes' || customItem.car_seat === 'Yes' || existingMeta.carSeat === 'Yes' || existingMeta.car_seat === 'Yes' || amenitiesLower.some(a => a.includes('car seat') || a.includes('baby'))) ? 'Yes' : 'No';
+    const stops = data.stops || customItem.stops || existingMeta.stops || 'No';
+    const stopLocations = data.stopLocations || data.stop_locations || customItem.stopLocations || existingMeta.stopLocations || null;
+    const rawBags = Number(data.bags !== undefined ? data.bags : (customItem.bags !== undefined ? customItem.bags : (existingMeta.bags !== undefined ? existingMeta.bags : 0)));
+    const luggage = (data.luggage && data.luggage !== 'No') ? data.luggage : (customItem.luggage && customItem.luggage !== 'No' ? customItem.luggage : (existingMeta.luggage && existingMeta.luggage !== 'No' ? existingMeta.luggage : (rawBags > 0 ? `Yes — ${rawBags} bag(s)` : 'No')));
+    const bags = rawBags;
+    const serviceType = data.serviceType || customItem.serviceType || existingMeta.serviceType || 'One Way';
+    const returnDate = data.returnDate || customItem.returnDate || existingMeta.returnDate || null;
+    const returnTime = data.returnTime || customItem.returnTime || existingMeta.returnTime || null;
+    const pickupTime = data.pickupTime || customItem.pickupTime || existingMeta.pickupTime || null;
+
+    orderData.metadata = {
+      ...existingMeta,
+      numberOfPassengers,
+      passengers: numberOfPassengers,
+      passengerCount: numberOfPassengers,
+      passengerName,
+      guestName: passengerName,
+      luggage: (luggage === 'Yes' && bags > 0) ? `Yes — ${bags} bag(s)` : luggage,
+      bags,
+      stops,
+      stopLocations,
+      wifi,
+      refreshments,
+      carSeat,
+      amenities: amenitiesArray,
+      serviceType,
+      returnDate,
+      returnTime,
+      pickupTime,
+      pickupLocation,
+      dropLocation,
+      location: dropLocation,
+      totalDistance,
+      customItems: metaCustomItems.length > 0 ? metaCustomItems : itemsToSave
+    };
+  } else {
+    orderData.metadata = {
+      ...existingMeta,
+      pickupLocation: pickupLocation || null,
+      dropLocation: dropLocation || null,
+      location: dropLocation || null,
+      totalDistance: totalDistance || null,
+      customItems: metaCustomItems.length > 0 ? metaCustomItems : itemsToSave
+    };
+  }
 
   const employee = await prisma.employee.findUnique({ where: { userId: performerId } });
   orderData.createdById = employee ? employee.id : 1;

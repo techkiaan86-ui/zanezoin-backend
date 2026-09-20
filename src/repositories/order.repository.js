@@ -114,7 +114,13 @@ export const findAllOrders = async (tenantId, query) => {
 
   const isCustomerFilter = !!(user_id || customer_email);
   const where = {
-    ...(tenantId !== null && tenantId !== undefined && { tenantId }),
+    ...((tenantId !== null && tenantId !== undefined && !isCustomerFilter) && { tenantId }),
+    ...(isCustomerFilter && {
+      OR: [
+        ...(tenantId !== null && tenantId !== undefined ? [{ tenantId }] : []),
+        ...(clientId ? [{ clientId: Number(clientId) }] : [])
+      ]
+    }),
     ...(search && { orderNumber: { contains: search } }),
     ...(status && { status }),
     ...(!isCustomerFilter && clientId && { clientId: Number(clientId) }),
@@ -146,9 +152,11 @@ export const findAllOrders = async (tenantId, query) => {
   let mappedOrders = allOrders.map(o => {
     const { metadata, ...rest } = o;
     const metadataObj = typeof metadata === 'string' ? JSON.parse(metadata) : (metadata || {});
-    const itemsArr = (o.items && o.items.length > 0)
-      ? o.items
-      : (Array.isArray(metadataObj.customItems) ? metadataObj.customItems : []);
+    let itemsArr = (o.items && o.items.length > 0) ? o.items : [];
+    if (itemsArr.length === 0) {
+      const candidates = metadataObj.customItems || metadataObj.custom_items || metadataObj.manifestItems || metadataObj.items || metadataObj.cart || [];
+      itemsArr = Array.isArray(candidates) ? candidates : [];
+    }
 
     return {
       ...metadataObj,
@@ -196,7 +204,7 @@ export const findAllOrders = async (tenantId, query) => {
     mappedOrders = mappedOrders.filter(o => {
       const oClientId = String(o.clientId || o.client_id || '');
       const oUserId = String(o.customer_id || o.created_by || o.createdById || o.userId || o.user_id || o.metadata?.userId || o.metadata?.user_id || o.metadata?.customer_id || o.metadata?.created_by || '');
-      const oEmail = String(o.email || o.client_email || o.customer_email || o.metadata?.email || o.metadata?.user_email || o.metadata?.customer_email || '').toLowerCase().trim();
+      const oEmail = String(o.email || o.client_email || o.customer_email || o.metadata?.email || o.metadata?.user_email || o.metadata?.customer_email || o.client?.email || '').toLowerCase().trim();
 
       if (filterUserId && oUserId && oUserId === filterUserId) return true;
       if (filterClientId && oClientId && oClientId === filterClientId) return true;

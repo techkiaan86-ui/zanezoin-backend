@@ -40,7 +40,7 @@ export const getTickets = async (tenantId, user) => {
   const roleName = typeof user?.role === 'object' ? (user?.role?.name || '') : String(user?.role || '');
   const normalizedRole = roleName.toLowerCase().replace(/\s+/g, '_');
   const userTenant = user?.tenantId ? Number(user.tenantId) : 1;
-  const isHQStaff = ['super_admin', 'superadmin', 'concierge', 'operations', 'logistics'].includes(normalizedRole) && userTenant === 1;
+  const isHQStaff = ['super_admin', 'superadmin', 'admin', 'concierge', 'operations', 'logistics', 'procurement', 'inventory', 'staff'].includes(normalizedRole) && userTenant === 1;
   const effectiveTenantId = isHQStaff ? null : tenantId;
   const tickets = await supportRepository.findAllTickets(effectiveTenantId);
 
@@ -129,7 +129,7 @@ export const getEvents = async (tenantId, user) => {
   const roleName = typeof user?.role === 'object' ? (user?.role?.name || '') : String(user?.role || '');
   const normalizedRole = roleName.toLowerCase().replace(/\s+/g, '_');
   const userTenant = user?.tenantId ? Number(user.tenantId) : 1;
-  const isHQStaff = ['super_admin', 'superadmin', 'concierge', 'operations', 'logistics'].includes(normalizedRole) && userTenant === 1;
+  const isHQStaff = ['super_admin', 'superadmin', 'admin', 'concierge', 'operations', 'logistics', 'procurement', 'inventory', 'staff'].includes(normalizedRole) && userTenant === 1;
   const effectiveTenantId = isHQStaff ? null : tenantId;
   const events = await supportRepository.findAllEvents(effectiveTenantId);
 
@@ -138,7 +138,7 @@ export const getEvents = async (tenantId, user) => {
     const myEmail = String(user?.email || '').toLowerCase().trim();
     const myClientId = user?.clientId;
     return events
-      .filter(e => (myClientId && e.clientId === myClientId) || (myEmail && e.client?.email?.toLowerCase().trim() === myEmail) || (myUserId && e.managerId === myUserId))
+      .filter(e => (myClientId && e.clientId === myClientId) || (myEmail && e.client?.email?.toLowerCase().trim() === myEmail) || (myUserId && e.managerId === myUserId) || (e.tenantId && e.tenantId === user?.tenantId))
       .map(e => ({ ...e, id: e.eventId }));
   }
 
@@ -146,7 +146,10 @@ export const getEvents = async (tenantId, user) => {
 };
 
 export const updateEvent = async (id, data, tenantId, performerId) => {
-  const existing = await supportRepository.findEventById(id, tenantId);
+  let existing = await supportRepository.findEventById(id, tenantId);
+  if (!existing && tenantId !== null) {
+    existing = await supportRepository.findEventById(id, null);
+  }
   if (!existing) throw new AppError('Event not found', 404);
 
   let updatedMoodBoard = data.mood_board_url !== undefined ? data.mood_board_url : (data.moodBoardUrl !== undefined ? data.moodBoardUrl : existing.moodBoardUrl);
@@ -175,9 +178,12 @@ export const updateEvent = async (id, data, tenantId, performerId) => {
 };
 
 export const deleteEvent = async (id, tenantId, performerId) => {
-  const existing = await supportRepository.findEventById(id, tenantId);
+  let existing = await supportRepository.findEventById(id, tenantId);
+  if (!existing && tenantId !== null) {
+    existing = await supportRepository.findEventById(id, null);
+  }
   if (!existing) throw new AppError('Event not found', 404);
-  await supportRepository.deleteEvent(id, tenantId);
+  await supportRepository.deleteEvent(id, existing.tenantId ?? tenantId);
   return true;
 };
 
@@ -206,14 +212,14 @@ export const getGuestRequests = async (tenantId, user) => {
   const roleName = typeof user?.role === 'object' ? (user?.role?.name || '') : String(user?.role || '');
   const normalizedRole = roleName.toLowerCase().replace(/\s+/g, '_');
   const userTenant = user?.tenantId ? Number(user.tenantId) : 1;
-  const isHQStaff = ['super_admin', 'superadmin', 'concierge', 'operations', 'logistics'].includes(normalizedRole) && userTenant === 1;
+  const isHQStaff = ['super_admin', 'superadmin', 'admin', 'concierge', 'operations', 'logistics', 'procurement', 'inventory', 'staff'].includes(normalizedRole) && userTenant === 1;
   const effectiveTenantId = isHQStaff ? null : tenantId;
   const reqs = await supportRepository.findAllGuestRequests(effectiveTenantId);
 
   if (['customer', 'individual_client', 'personal'].some(r => normalizedRole.includes(r))) {
     const myUserId = String(user?.id);
     return reqs
-      .filter(r => String(r.created_by) === myUserId || String(r.userId) === myUserId || String(r.user_id) === myUserId)
+      .filter(r => String(r.created_by) === myUserId || String(r.userId) === myUserId || String(r.user_id) === myUserId || (r.tenantId && r.tenantId === user?.tenantId))
       .map(r => ({ ...r, id: r.requestId }));
   }
 
@@ -221,18 +227,24 @@ export const getGuestRequests = async (tenantId, user) => {
 };
 
 export const updateGuestRequest = async (id, data, tenantId, performerId) => {
-  const existing = await supportRepository.findGuestRequestById(id, tenantId);
+  let existing = await supportRepository.findGuestRequestById(id, tenantId);
+  if (!existing && tenantId !== null) {
+    existing = await supportRepository.findGuestRequestById(id, null);
+  }
   if (!existing) throw new AppError('Guest Request not found', 404);
   
   if (data.guest && !data.guestName) data.guestName = data.guest;
 
-  const updated = await supportRepository.updateGuestRequest(id, tenantId, data);
+  const updated = await supportRepository.updateGuestRequest(id, existing.tenantId ?? tenantId, data);
   return { ...updated, id: updated.requestId };
 };
 
 export const deleteGuestRequest = async (id, tenantId, performerId) => {
-  const existing = await supportRepository.findGuestRequestById(id, tenantId);
+  let existing = await supportRepository.findGuestRequestById(id, tenantId);
+  if (!existing && tenantId !== null) {
+    existing = await supportRepository.findGuestRequestById(id, null);
+  }
   if (!existing) throw new AppError('Guest Request not found', 404);
-  await supportRepository.deleteGuestRequest(id, tenantId);
+  await supportRepository.deleteGuestRequest(id, existing.tenantId ?? tenantId);
   return true;
 };
