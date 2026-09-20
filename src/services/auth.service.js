@@ -21,16 +21,31 @@ export const loginUser = async (email, password, tenantId, ipAddress, userAgent)
 
   // Attach client info
   if (user.tenantId) {
-    let client = await prisma.client.findFirst({
-      where: {
-        OR: [
-          { email: user.email },
-          { companyName: user.name }
-        ]
+    let client = null;
+    if (user.email) {
+      if (user.tenantId !== 1) {
+        client = await prisma.client.findFirst({
+          where: { email: user.email, tenantId: user.tenantId }
+        });
       }
-    });
+      if (!client) {
+        client = await prisma.client.findFirst({
+          where: { email: user.email }
+        });
+      }
+    }
     if (!client && user.tenantId !== 1) {
       client = await prisma.client.findFirst({ where: { tenantId: user.tenantId } });
+    }
+    if (!client && user.name) {
+      client = await prisma.client.findFirst({
+        where: { companyName: user.name, ...(user.tenantId !== 1 ? { tenantId: user.tenantId } : {}) }
+      });
+      if (!client) {
+        client = await prisma.client.findFirst({
+          where: { companyName: user.name }
+        });
+      }
     }
     if (client) {
       user.clientId = client.id;
@@ -152,16 +167,31 @@ export const getProfile = async (userId) => {
 
   // Attach client info
   if (user.tenantId) {
-    let client = await prisma.client.findFirst({
-      where: {
-        OR: [
-          { email: user.email },
-          { companyName: user.name }
-        ]
+    let client = null;
+    if (user.email) {
+      if (user.tenantId !== 1) {
+        client = await prisma.client.findFirst({
+          where: { email: user.email, tenantId: user.tenantId }
+        });
       }
-    });
+      if (!client) {
+        client = await prisma.client.findFirst({
+          where: { email: user.email }
+        });
+      }
+    }
     if (!client && user.tenantId !== 1) {
       client = await prisma.client.findFirst({ where: { tenantId: user.tenantId } });
+    }
+    if (!client && user.name) {
+      client = await prisma.client.findFirst({
+        where: { companyName: user.name, ...(user.tenantId !== 1 ? { tenantId: user.tenantId } : {}) }
+      });
+      if (!client) {
+        client = await prisma.client.findFirst({
+          where: { companyName: user.name }
+        });
+      }
     }
     if (client) {
       user.clientId = client.id;

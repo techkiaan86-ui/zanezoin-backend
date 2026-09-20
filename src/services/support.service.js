@@ -33,7 +33,7 @@ export const createTicket = async (data, performerId, tenantId) => {
 
   const ticket = await supportRepository.createTicket(payload);
   await logAudit({ module: 'SUPPORT', action: 'CREATE', description: `Logged ticket ${ticket.ticketId}`, newValue: ticket, performedBy: performerId });
-  return { ...ticket, id: ticket.ticketId };
+  return { ...ticket, id: ticket.ticketId, ticketId: ticket.ticketId, db_id: ticket.id };
 };
 
 export const getTickets = async (tenantId, user) => {
@@ -50,10 +50,10 @@ export const getTickets = async (tenantId, user) => {
     const myClientId = user?.clientId;
     return tickets
       .filter(t => (myUserId && t.createdById === myUserId) || (myEmail && t.createdByEmail?.toLowerCase().trim() === myEmail) || (myClientId && t.clientId === myClientId))
-      .map(t => ({ ...t, id: t.ticketId }));
+      .map(t => ({ ...t, id: t.ticketId, ticketId: t.ticketId, db_id: t.id }));
   }
 
-  return tickets.map(t => ({ ...t, id: t.ticketId }));
+  return tickets.map(t => ({ ...t, id: t.ticketId, ticketId: t.ticketId, db_id: t.id }));
 };
 
 export const updateTicket = async (id, data, tenantId, performerId) => {
@@ -78,7 +78,7 @@ export const updateTicket = async (id, data, tenantId, performerId) => {
 
   const updated = await supportRepository.updateTicket(id, null, payload);
   await logAudit({ module: 'SUPPORT', action: 'UPDATE', description: `Updated ticket ${id}`, oldValue: existing, newValue: updated, performedBy: performerId });
-  return { ...updated, id: updated.ticketId };
+  return { ...updated, id: updated.ticketId, ticketId: updated.ticketId, db_id: updated.id };
 };
 
 export const deleteTicket = async (id, tenantId, performerId) => {
@@ -122,7 +122,7 @@ export const createEvent = async (data, performerId, tenantId) => {
   };
 
   const event = await supportRepository.createEvent(payload);
-  return { ...event, id: event.eventId };
+  return { ...event, id: event.eventId, db_id: event.id };
 };
 
 export const getEvents = async (tenantId, user) => {
@@ -139,10 +139,10 @@ export const getEvents = async (tenantId, user) => {
     const myClientId = user?.clientId;
     return events
       .filter(e => (myClientId && e.clientId === myClientId) || (myEmail && e.client?.email?.toLowerCase().trim() === myEmail) || (myUserId && e.managerId === myUserId) || (e.tenantId && e.tenantId === user?.tenantId))
-      .map(e => ({ ...e, id: e.eventId }));
+      .map(e => ({ ...e, id: e.eventId, db_id: e.id }));
   }
 
-  return events.map(e => ({ ...e, id: e.eventId }));
+  return events.map(e => ({ ...e, id: e.eventId, db_id: e.id }));
 };
 
 export const updateEvent = async (id, data, tenantId, performerId) => {
@@ -174,7 +174,7 @@ export const updateEvent = async (id, data, tenantId, performerId) => {
   };
 
   const updated = await supportRepository.updateEvent(id, tenantId, payload);
-  return { ...updated, id: updated.eventId };
+  return { ...updated, id: updated.eventId, db_id: updated.id };
 };
 
 export const deleteEvent = async (id, tenantId, performerId) => {
@@ -205,7 +205,7 @@ export const createGuestRequest = async (data, performerId, tenantId) => {
   };
 
   const req = await supportRepository.createGuestRequest(payload);
-  return { ...req, id: req.requestId };
+  return { ...req, id: req.requestId, db_id: req.id };
 };
 
 export const getGuestRequests = async (tenantId, user) => {
@@ -220,10 +220,10 @@ export const getGuestRequests = async (tenantId, user) => {
     const myUserId = String(user?.id);
     return reqs
       .filter(r => String(r.created_by) === myUserId || String(r.userId) === myUserId || String(r.user_id) === myUserId || (r.tenantId && r.tenantId === user?.tenantId))
-      .map(r => ({ ...r, id: r.requestId }));
+      .map(r => ({ ...r, id: r.requestId, db_id: r.id }));
   }
 
-  return reqs.map(r => ({ ...r, id: r.requestId }));
+  return reqs.map(r => ({ ...r, id: r.requestId, db_id: r.id }));
 };
 
 export const updateGuestRequest = async (id, data, tenantId, performerId) => {
@@ -236,7 +236,7 @@ export const updateGuestRequest = async (id, data, tenantId, performerId) => {
   if (data.guest && !data.guestName) data.guestName = data.guest;
 
   const updated = await supportRepository.updateGuestRequest(id, existing.tenantId ?? tenantId, data);
-  return { ...updated, id: updated.requestId };
+  return { ...updated, id: updated.requestId, db_id: updated.id };
 };
 
 export const deleteGuestRequest = async (id, tenantId, performerId) => {

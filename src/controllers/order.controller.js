@@ -66,9 +66,29 @@ export const createOrder = async (req, res, next) => {
         });
       }
 
-      parsedClientId = clientRecord.id;
+    // For customers, their orders MUST strictly belong to their own client record on their tenant
+    if (isCustomerRole) {
+      let customerClient = null;
+      if (req.user.email) {
+        if (req.user.tenantId && req.user.tenantId !== 1) {
+          customerClient = await prisma.client.findFirst({
+            where: { email: req.user.email, tenantId: Number(req.user.tenantId) }
+          });
+        }
+        if (!customerClient) {
+          customerClient = await prisma.client.findFirst({
+            where: { email: req.user.email }
+          });
+        }
+      }
+      if (customerClient) {
+        parsedClientId = customerClient.id;
+      }
+      // Customer orders always start in 'created' state awaiting admin approval
+      req.body.status = 'created';
+    } else if (isBusinessClient) {
+      req.body.status = 'created';
     }
-
 
     req.body.clientId = parsedClientId;
 

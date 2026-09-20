@@ -4,24 +4,26 @@ import prisma from '../config/db.js';
 export const createTicket = async (data) => await prisma.supportTicket.create({ data });
 export const findAllTickets = async (tenantId) => await prisma.supportTicket.findMany({ where: { ...(tenantId !== null && { tenantId }) }, orderBy: { createdAt: 'desc' } });
 export const findTicketById = async (ticketId, tenantId) => {
-  if (tenantId === null) return await prisma.supportTicket.findFirst({ where: { ticketId } });
-  return await prisma.supportTicket.findUnique({ where: { ticketId_tenantId: { ticketId, tenantId } } });
+  const isNum = !isNaN(Number(ticketId)) && String(ticketId).trim() !== '';
+  const numId = isNum ? Number(ticketId) : null;
+  const where = {
+    OR: [
+      { ticketId: String(ticketId) },
+      ...(numId !== null ? [{ id: numId }] : [])
+    ],
+    ...(tenantId !== null && { tenantId })
+  };
+  return await prisma.supportTicket.findFirst({ where });
 };
 export const updateTicket = async (ticketId, tenantId, data) => {
-  if (tenantId === null) {
-    const existing = await prisma.supportTicket.findFirst({ where: { ticketId } });
-    if (!existing) return null;
-    return await prisma.supportTicket.update({ where: { id: existing.id }, data });
-  }
-  return await prisma.supportTicket.update({ where: { ticketId_tenantId: { ticketId, tenantId } }, data });
+  const existing = await findTicketById(ticketId, tenantId);
+  if (!existing) return null;
+  return await prisma.supportTicket.update({ where: { id: existing.id }, data });
 };
 export const deleteTicket = async (ticketId, tenantId) => {
-  if (tenantId === null) {
-    const existing = await prisma.supportTicket.findFirst({ where: { ticketId } });
-    if (!existing) return null;
-    return await prisma.supportTicket.delete({ where: { id: existing.id } });
-  }
-  return await prisma.supportTicket.delete({ where: { ticketId_tenantId: { ticketId, tenantId } } });
+  const existing = await findTicketById(ticketId, tenantId);
+  if (!existing) return null;
+  return await prisma.supportTicket.delete({ where: { id: existing.id } });
 };
 
 // Events
@@ -35,24 +37,32 @@ export const findAllEvents = async (tenantId) => await prisma.event.findMany({
   orderBy: { createdAt: 'desc' }
 });
 export const findEventById = async (eventId, tenantId) => {
-  if (tenantId === null) return await prisma.event.findFirst({ where: { eventId } });
-  return await prisma.event.findUnique({ where: { eventId_tenantId: { eventId, tenantId } } });
+  const isNum = !isNaN(Number(eventId)) && String(eventId).trim() !== '';
+  const numId = isNum ? Number(eventId) : null;
+  const where = {
+    OR: [
+      { eventId: String(eventId) },
+      ...(numId !== null ? [{ id: numId }] : [])
+    ],
+    ...(tenantId !== null && { tenantId })
+  };
+  return await prisma.event.findFirst({
+    where,
+    include: {
+      client: { select: { id: true, companyName: true, contactPerson: true, email: true } },
+      manager: { select: { id: true, name: true, email: true } }
+    }
+  });
 };
 export const updateEvent = async (eventId, tenantId, data) => {
-  if (tenantId === null) {
-    const existing = await prisma.event.findFirst({ where: { eventId } });
-    if (!existing) return null;
-    return await prisma.event.update({ where: { id: existing.id }, data });
-  }
-  return await prisma.event.update({ where: { eventId_tenantId: { eventId, tenantId } }, data });
+  const existing = await findEventById(eventId, tenantId);
+  if (!existing) return null;
+  return await prisma.event.update({ where: { id: existing.id }, data });
 };
 export const deleteEvent = async (eventId, tenantId) => {
-  if (tenantId === null) {
-    const existing = await prisma.event.findFirst({ where: { eventId } });
-    if (!existing) return null;
-    return await prisma.event.delete({ where: { id: existing.id } });
-  }
-  return await prisma.event.delete({ where: { eventId_tenantId: { eventId, tenantId } } });
+  const existing = await findEventById(eventId, tenantId);
+  if (!existing) return null;
+  return await prisma.event.delete({ where: { id: existing.id } });
 };
 
 // Guest Requests
@@ -87,12 +97,16 @@ export const findAllGuestRequests = async (tenantId) => {
 };
 
 export const findGuestRequestById = async (requestId, tenantId) => {
-  let req;
-  if (tenantId === null) {
-    req = await prisma.guestRequest.findFirst({ where: { requestId } });
-  } else {
-    req = await prisma.guestRequest.findUnique({ where: { requestId_tenantId: { requestId, tenantId } } });
-  }
+  const isNum = !isNaN(Number(requestId)) && String(requestId).trim() !== '';
+  const numId = isNum ? Number(requestId) : null;
+  const where = {
+    OR: [
+      { requestId: String(requestId) },
+      ...(numId !== null ? [{ id: numId }] : [])
+    ],
+    ...(tenantId !== null && { tenantId })
+  };
+  const req = await prisma.guestRequest.findFirst({ where });
   return mapGuestRequest(req);
 };
 
@@ -121,10 +135,7 @@ export const updateGuestRequest = async (requestId, tenantId, data) => {
 };
 
 export const deleteGuestRequest = async (requestId, tenantId) => {
-  if (tenantId === null) {
-    const existing = await prisma.guestRequest.findFirst({ where: { requestId } });
-    if (!existing) return null;
-    return await prisma.guestRequest.delete({ where: { id: existing.id } });
-  }
-  return await prisma.guestRequest.delete({ where: { requestId_tenantId: { requestId, tenantId } } });
+  const existing = await findGuestRequestById(requestId, tenantId);
+  if (!existing) return null;
+  return await prisma.guestRequest.delete({ where: { id: existing.id } });
 };

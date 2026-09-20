@@ -55,7 +55,27 @@ export const createOrder = async (data, performerId, tenantId) => {
   const { items, ...orderData } = data;
 
   let client = null;
-  if (data.clientId) {
+
+  // If order is created by a customer, strictly prioritize their dedicated client record on their tenant
+  if (performerId) {
+    const user = await prisma.user.findUnique({
+      where: { id: Number(performerId) },
+      include: { role: true }
+    });
+    const roleName = String(user?.role?.name || user?.role || '').toUpperCase();
+    if (['CUSTOMER', 'INDIVIDUAL_CLIENT'].includes(roleName) && user?.email) {
+      client = await prisma.client.findFirst({
+        where: { email: user.email, tenantId: user.tenantId }
+      }) || await prisma.client.findFirst({
+        where: { email: user.email }
+      });
+      if (client) {
+        orderData.clientId = client.id;
+      }
+    }
+  }
+
+  if (!client && data.clientId) {
     const cid = Number(data.clientId);
     if (!isNaN(cid)) {
       client = await clientRepo.findClientById(cid);
@@ -268,7 +288,12 @@ export const createOrder = async (data, performerId, tenantId) => {
 
   const employee = await prisma.employee.findUnique({ where: { userId: performerId } });
   orderData.createdById = employee ? employee.id : 1;
-  orderData.status = data.status || (isMarketplaceOrder ? 'operation' : 'draft');
+  orderData.status = data.status || 'created';
+
+  const typeStrLower = String(data.orderType || data.type || orderData.orderType || '').toLowerCase();
+  if (isMarketplaceOrder || typeStrLower.includes('marketplace') || typeStrLower.includes('delivery')) {
+    orderData.orderType = 'Delivery';
+  }
 
   const newOrder = await orderRepo.createOrder(orderData, validOrderItems, orderTenantId);
 
