@@ -114,7 +114,7 @@ export const findAllOrders = async (tenantId, query) => {
 
   const isCustomerFilter = !!(user_id || customer_email);
   const where = {
-    ...(tenantId !== null && tenantId !== undefined && { tenantId }),
+    ...(!isCustomerFilter && tenantId !== null && tenantId !== undefined && { tenantId }),
     ...(search && { orderNumber: { contains: search } }),
     ...(status && { status }),
     ...(!isCustomerFilter && clientId && { clientId: Number(clientId) }),
