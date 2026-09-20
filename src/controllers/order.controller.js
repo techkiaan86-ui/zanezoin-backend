@@ -65,6 +65,7 @@ export const createOrder = async (req, res, next) => {
           }
         });
       }
+    }
 
     // For customers, their orders MUST strictly belong to their own client record on their tenant
     if (isCustomerRole) {

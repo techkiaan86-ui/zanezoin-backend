@@ -25,6 +25,7 @@ const corsOptions = {
       'https://zanezion.kiaansoftware.com',
       'https://zanezion-01.netlify.app',
       'https://zanezion.netlify.app',
+      'https://zanezion-updated.netlify.app',
       ...envOrigins
     ];
 
@@ -65,6 +66,7 @@ const corsOptions = {
 };
 
 app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
 
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
