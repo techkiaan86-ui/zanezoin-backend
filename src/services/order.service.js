@@ -390,6 +390,15 @@ export const updateOrderStatus = async (id, status, tenantId, performerId, remar
         where: { orderId: id },
         data: { status: 'delivered' }
       }).catch(() => null);
+    } else if (['cancelled', 'rejected', 'canceled'].includes(String(status).toLowerCase())) {
+      await tx.delivery.updateMany({
+        where: { orderId: id },
+        data: { status: 'cancelled' }
+      }).catch(() => null);
+      await tx.mission.updateMany({
+        where: { orderId: id },
+        data: { status: 'cancelled' }
+      }).catch(() => null);
     }
   });
 
@@ -491,14 +500,26 @@ export const updateOrder = async (id, data, tenantId, performerId) => {
     ...metadataExt
   };
 
+  const newStatus = data.status ? String(data.status).toLowerCase() : order.status;
   const updatedOrder = await prisma.order.update({
     where: { id },
     data: {
       ...dbData,
-      status: data.status || order.status,
+      status: newStatus,
       metadata: finalMetadata
     }
   });
+
+  if (['cancelled', 'rejected', 'canceled'].includes(newStatus)) {
+    await prisma.delivery.updateMany({
+      where: { orderId: id },
+      data: { status: 'cancelled' }
+    }).catch(() => null);
+    await prisma.mission.updateMany({
+      where: { orderId: id },
+      data: { status: 'cancelled' }
+    }).catch(() => null);
+  }
 
   const { metadata, ...rest } = updatedOrder;
   return {
