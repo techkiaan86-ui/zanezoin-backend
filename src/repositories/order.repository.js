@@ -195,7 +195,7 @@ export const findAllOrders = async (tenantId, query) => {
 
     mappedOrders = mappedOrders.filter(o => {
       const oClientId = String(o.clientId || o.client_id || '');
-      const oUserId = String(o.customer_id || o.created_by || o.createdById || o.userId || o.user_id || o.metadata?.userId || o.metadata?.user_id || o.metadata?.customer_id || o.metadata?.created_by || '');
+      const oUserId = String(o.userId || o.user_id || o.customer_id || o.metadata?.userId || o.metadata?.user_id || o.metadata?.customer_id || o.created_by || o.createdById || o.metadata?.created_by || '');
       const oEmail = String(o.email || o.client_email || o.customer_email || o.metadata?.email || o.metadata?.user_email || o.metadata?.customer_email || '').toLowerCase().trim();
 
       if (filterUserId && oUserId && oUserId === filterUserId) return true;
