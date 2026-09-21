@@ -146,11 +146,19 @@ export const findAllOrders = async (tenantId, query) => {
   let mappedOrders = allOrders.map(o => {
     const { metadata, ...rest } = o;
     const metadataObj = typeof metadata === 'string' ? JSON.parse(metadata) : (metadata || {});
-    let itemsArr = (o.items && o.items.length > 0) ? o.items : [];
-    if (itemsArr.length === 0) {
-      const candidates = metadataObj.customItems || metadataObj.custom_items || metadataObj.manifestItems || metadataObj.items || metadataObj.cart || [];
-      itemsArr = Array.isArray(candidates) ? candidates : [];
-    }
+    const manifestCandidates = metadataObj.customItems || metadataObj.custom_items || metadataObj.manifestItems || metadataObj.items || metadataObj.cart || [];
+    const metaList = Array.isArray(manifestCandidates) ? manifestCandidates : [];
+
+    let itemsArr = (o.items && o.items.length > 0)
+      ? o.items.map((oi, idx) => {
+          const metaMatch = metaList[idx] || metaList.find(m => (m.itemId && m.itemId === oi.itemId) || (m.id && m.id === oi.itemId) || m.name === oi.item?.name);
+          return {
+            ...oi,
+            name: metaMatch?.name || oi.name || oi.item?.name || `Item ${idx + 1}`,
+            price: oi.unitPrice != null ? oi.unitPrice : (metaMatch?.price || oi.item?.price || 0)
+          };
+        })
+      : metaList;
 
     return {
       ...metadataObj,

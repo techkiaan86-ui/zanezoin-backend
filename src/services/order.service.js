@@ -155,14 +155,42 @@ export const createOrder = async (data, performerId, tenantId) => {
       const parsedWhId = rawWhId != null && !isNaN(Number(rawWhId)) ? Number(rawWhId) : (defaultWarehouse?.id || 1);
 
       let dbItemExists = false;
+      let targetItemId = parsedItemId;
       if (parsedItemId) {
-        const dbItem = await prisma.item.findUnique({ where: { id: parsedItemId } });
-        if (dbItem) dbItemExists = true;
+        let dbItem = await prisma.item.findUnique({ where: { id: parsedItemId } });
+        if (dbItem) {
+          if (item.name && typeof item.name === 'string' && item.name.trim() && dbItem.name.trim().toLowerCase() !== item.name.trim().toLowerCase()) {
+            const nameMatch = await prisma.item.findFirst({
+              where: { name: item.name.trim() }
+            });
+            if (nameMatch) {
+              targetItemId = nameMatch.id;
+              dbItem = nameMatch;
+            }
+          }
+          dbItemExists = true;
+        } else if (item.name && typeof item.name === 'string' && item.name.trim()) {
+          const nameMatch = await prisma.item.findFirst({
+            where: { name: item.name.trim() }
+          });
+          if (nameMatch) {
+            targetItemId = nameMatch.id;
+            dbItemExists = true;
+          }
+        }
+      } else if (item.name && typeof item.name === 'string' && item.name.trim()) {
+        const nameMatch = await prisma.item.findFirst({
+          where: { name: item.name.trim() }
+        });
+        if (nameMatch) {
+          targetItemId = nameMatch.id;
+          dbItemExists = true;
+        }
       }
 
-      if (parsedItemId && parsedWhId && dbItemExists) {
+      if (targetItemId && parsedWhId && dbItemExists) {
         validOrderItems.push({
-          itemId: parsedItemId,
+          itemId: targetItemId,
           warehouseId: parsedWhId,
           quantity: Number(item.quantity || item.qty || 1),
           unitPrice: Number(item.unitPrice || item.price || 0)
