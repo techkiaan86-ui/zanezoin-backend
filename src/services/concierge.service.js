@@ -28,7 +28,13 @@ export const getItems = async (tenantId) => {
 };
 
 export const updateItem = async (id, data, tenantId, performerId) => {
-  const existing = await conciergeRepository.findItemById(id, tenantId);
+  let existing = await conciergeRepository.findItemById(id, tenantId);
+  if (!existing && tenantId !== 1) {
+    existing = await conciergeRepository.findItemById(id, 1);
+  }
+  if (!existing && tenantId !== null) {
+    existing = await conciergeRepository.findItemById(id, null);
+  }
   if (!existing) throw new AppError('Item not found', 404);
 
   const payload = {
@@ -39,15 +45,21 @@ export const updateItem = async (id, data, tenantId, performerId) => {
     status: data.status !== undefined ? data.status : existing.status
   };
 
-  const updated = await conciergeRepository.updateItem(id, tenantId, payload);
+  const updated = await conciergeRepository.updateItem(id, existing.tenantId, payload);
   await logAudit({ module: 'CONCIERGE', action: 'UPDATE', description: `Updated luxury item ${updated.name}`, oldValue: existing, newValue: updated, performedBy: performerId });
   return { ...updated, id: updated.itemId };
 };
 
 export const deleteItem = async (id, tenantId, performerId) => {
-  const existing = await conciergeRepository.findItemById(id, tenantId);
+  let existing = await conciergeRepository.findItemById(id, tenantId);
+  if (!existing && tenantId !== 1) {
+    existing = await conciergeRepository.findItemById(id, 1);
+  }
+  if (!existing && tenantId !== null) {
+    existing = await conciergeRepository.findItemById(id, null);
+  }
   if (!existing) throw new AppError('Item not found', 404);
-  await conciergeRepository.deleteItem(id, tenantId);
+  await conciergeRepository.deleteItem(id, existing.tenantId);
   await logAudit({ module: 'CONCIERGE', action: 'DELETE', description: `Deleted luxury item ${existing.name}`, oldValue: existing, performedBy: performerId });
   return true;
 };

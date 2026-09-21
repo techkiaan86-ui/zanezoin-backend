@@ -4,7 +4,16 @@ const mapItem = (req) => {
   if (!req) return req;
   const { metadata, ...rest } = req;
   const metadataObj = typeof metadata === 'string' ? JSON.parse(metadata) : (metadata || {});
-  return { ...rest, ...metadataObj, metadata: metadataObj };
+  const cleanMetadata = { ...metadataObj };
+  delete cleanMetadata.id;
+  return {
+    ...cleanMetadata,
+    ...rest,
+    id: rest.id,
+    dbId: rest.id,
+    itemId: rest.itemId || metadataObj.itemId || metadataObj.id,
+    metadata: cleanMetadata
+  };
 };
 
 export const createItem = async (data) => {
@@ -14,7 +23,7 @@ export const createItem = async (data) => {
   Object.keys(data).forEach(key => {
     if (validDbKeys.includes(key)) {
       dbData[key] = data[key];
-    } else {
+    } else if (key !== 'id' && key !== 'dbId') {
       metadataExt[key] = data[key];
     }
   });
@@ -29,10 +38,21 @@ export const findAllItems = async (tenantId) => {
 
 export const findItemById = async (itemId, tenantId) => {
   let item;
+  const numId = Number(itemId);
+  const isNumeric = !isNaN(numId) && String(numId) === String(itemId);
+
   if (tenantId === null) {
-    item = await prisma.luxuryItem.findFirst({ where: { itemId } });
+    if (isNumeric) {
+      item = await prisma.luxuryItem.findFirst({ where: { OR: [{ id: numId }, { itemId: String(itemId) }] } });
+    } else {
+      item = await prisma.luxuryItem.findFirst({ where: { itemId: String(itemId) } });
+    }
   } else {
-    item = await prisma.luxuryItem.findUnique({ where: { itemId_tenantId: { itemId, tenantId } } });
+    if (isNumeric) {
+      item = await prisma.luxuryItem.findFirst({ where: { OR: [{ id: numId, tenantId }, { itemId: String(itemId), tenantId }] } });
+    } else {
+      item = await prisma.luxuryItem.findUnique({ where: { itemId_tenantId: { itemId: String(itemId), tenantId } } });
+    }
   }
   return mapItem(item);
 };
@@ -47,7 +67,7 @@ export const updateItem = async (itemId, tenantId, data) => {
   Object.keys(data).forEach(key => {
     if (validDbKeys.includes(key)) {
       dbData[key] = data[key];
-    } else {
+    } else if (key !== 'id' && key !== 'dbId') {
       metadataExt[key] = data[key];
     }
   });
@@ -56,16 +76,36 @@ export const updateItem = async (itemId, tenantId, data) => {
     ...(existing.metadata || {}),
     ...metadataExt
   };
+  delete finalMetadata.id;
 
-  const updated = await prisma.luxuryItem.update({ where: { id: existing.id }, data: { ...dbData, metadata: finalMetadata } });
+  const targetTenantId = existing.tenantId || tenantId || 1;
+  const targetItemId = existing.itemId || String(itemId);
+
+  const updated = await prisma.luxuryItem.update({
+    where: {
+      itemId_tenantId: {
+        itemId: targetItemId,
+        tenantId: targetTenantId
+      }
+    },
+    data: { ...dbData, metadata: finalMetadata }
+  });
   return mapItem(updated);
 };
 
 export const deleteItem = async (itemId, tenantId) => {
-  if (tenantId === null) {
-    const existing = await prisma.luxuryItem.findFirst({ where: { itemId } });
-    if (!existing) return null;
-    return await prisma.luxuryItem.delete({ where: { id: existing.id } });
-  }
-  return await prisma.luxuryItem.delete({ where: { itemId_tenantId: { itemId, tenantId } } });
+  const existing = await findItemById(itemId, tenantId);
+  if (!existing) return null;
+
+  const targetTenantId = existing.tenantId || tenantId || 1;
+  const targetItemId = existing.itemId || String(itemId);
+
+  return await prisma.luxuryItem.delete({
+    where: {
+      itemId_tenantId: {
+        itemId: targetItemId,
+        tenantId: targetTenantId
+      }
+    }
+  });
 };
