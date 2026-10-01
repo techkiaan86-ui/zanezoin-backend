@@ -80,9 +80,20 @@ export const findAllDeliveries = async (tenantId, query) => {
   const { page = 1, limit = 10, search = '', status, warehouseId, assignedTo, clientId } = query;
   const skip = (page - 1) * limit;
 
+  const searchCondition = search ? {
+    OR: [
+      { deliveryNumber: { contains: search } },
+      { remarks: { contains: search } },
+      { order: { orderNumber: { contains: search } } },
+      { client: { companyName: { contains: search } } },
+      { client: { contactPerson: { contains: search } } },
+      ...(!isNaN(Number(search)) ? [{ id: Number(search) }, { orderId: Number(search) }] : [])
+    ]
+  } : {};
+
   const where = {
     ...(tenantId !== null && { tenantId }),
-    ...(search && { deliveryNumber: { contains: search } }),
+    ...searchCondition,
     ...(status && { status }),
     ...(warehouseId && { warehouseId: Number(warehouseId) }),
     ...(assignedTo && { assignedTo: Number(assignedTo) }),
