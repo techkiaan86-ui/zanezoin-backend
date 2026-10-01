@@ -107,8 +107,8 @@ export const findAllDeliveries = async (tenantId, query) => {
       take: Number(limit),
       orderBy: { createdAt: 'desc' },
       include: {
-        client: { select: { companyName: true } },
-        order: { select: { orderNumber: true } },
+        client: { select: { companyName: true, contactPerson: true, email: true } },
+        order: { select: { orderNumber: true, metadata: true } },
         assignee: { select: { firstName: true, lastName: true, userId: true } },
         items: { include: { item: true } },
         proofs: true
