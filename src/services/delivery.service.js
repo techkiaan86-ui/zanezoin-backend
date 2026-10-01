@@ -635,6 +635,16 @@ export const deleteDelivery = async (id, tenantId, performerId, clientId = null)
     await tx.delivery.delete({
       where: { id }
     });
+
+    // 6. Revert the order status so it isn't permanently stuck as 'assigned'
+    if (delivery.orderId) {
+      try {
+        await tx.order.update({
+          where: { id: delivery.orderId },
+          data: { status: 'logistics' }
+        });
+      } catch (_) {}
+    }
   });
 
   await logAudit({
